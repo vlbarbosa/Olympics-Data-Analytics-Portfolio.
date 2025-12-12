@@ -1,0 +1,327 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard: Análise Olímpica</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* --- ESTILO DARK MODE (Visual Escuro) --- */
+        :root {
+            --bg-color: #121212;      /* Cor de fundo da página */
+            --card-bg: #1e1e1e;       /* Cor de fundo dos cartões */
+            --text-main: #e0e0e0;     /* Cor do texto principal */
+            --text-muted: #a0a0a0;    /* Cor do texto secundário */
+            --accent-color: #bb86fc;  /* Cor de destaque (Roxo Neon) */
+            --border-color: #333;     /* Cor das bordas */
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+        }
+        .header h1 { margin: 0; font-size: 1.5rem; letter-spacing: 1px; }
+        .header span { color: var(--accent-color); font-weight: bold; }
+
+        /* KPI Cards (Os cartões com números) */
+        .kpi-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            text-align: left;
+            transition: transform 0.2s;
+        }
+        .card:hover { transform: translateY(-5px); border-color: var(--accent-color); }
+        .card h3 { margin: 0; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+        .card p { margin: 10px 0 0; font-size: 1.8rem; font-weight: 600; color: #fff; }
+        .card .small-indicator { font-size: 0.9rem; color: #03dac6; } /* Verde Neon para subtextos */
+
+        /* Controles (Filtros) */
+        .controls {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border: 1px solid var(--border-color);
+        }
+        select {
+            padding: 10px;
+            border-radius: 4px;
+            background: #2c2c2c;
+            color: white;
+            border: 1px solid var(--border-color);
+            font-size: 1em;
+            outline: none;
+        }
+
+        /* Grid de Gráficos (Layout) */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr; /* 2 partes para o gráfico grande, 1 para o pequeno */
+            grid-template-rows: 400px 300px;
+            gap: 20px;
+        }
+
+        .chart-box {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .full-width { grid-column: 1 / -1; height: 300px; } /* Ocupa a largura total */
+
+        /* Ajuste para celular */
+        @media (max-width: 900px) {
+            .charts-grid { grid-template-columns: 1fr; grid-template-rows: auto; }
+            .full-width { grid-column: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>ANÁLISE <span>OLÍMPICA</span></h1>
+        <p style="color: var(--text-muted)">Projeto de Portfólio - Big Data</p>
+    </div>
+
+    <div class="kpi-container">
+        <div class="card">
+            <h3>Atletas Analisados</h3>
+            <p id="kpi-total">0</p>
+        </div>
+        <div class="card">
+            <h3>IMC Médio</h3>
+            <p id="kpi-imc">0.0</p>
+            <span class="small-indicator">Índice de Massa Corporal</span>
+        </div>
+        <div class="card">
+            <h3>Medalhistas</h3>
+            <p id="kpi-medalhas">0%</p>
+            <span class="small-indicator">Taxa de Conversão</span>
+        </div>
+        <div class="card">
+            <h3>Altura Média</h3>
+            <p id="kpi-altura">0 cm</p>
+        </div>
+    </div>
+
+    <div class="controls">
+        <label>FILTRAR POR ESPORTE:</label>
+        <select id="filtroEsporte" onchange="atualizarDashboard()">
+            <option value="Todos">Todos os Esportes</option>
+        </select>
+    </div>
+
+    <div class="charts-grid">
+        <div class="chart-box">
+            <canvas id="scatterChart"></canvas>
+        </div>
+        <div class="chart-box">
+            <canvas id="barChart"></canvas>
+        </div>
+        <div class="chart-box full-width">
+            <canvas id="lineChart"></canvas>
+        </div>
+    </div>
+
+    <script src="dados_atletas.js"></script>
+
+    <script>
+        // --- LÓGICA JAVASCRIPT ---
+
+        // Configuração Global das Cores para o Tema Escuro
+        Chart.defaults.color = '#a0a0a0';
+        Chart.defaults.borderColor = '#333';
+
+        let chartDispersao, chartBarras, chartLinha;
+
+        // Quando a página carregar, executa isso:
+        document.addEventListener('DOMContentLoaded', () => {
+            preencherFiltro();
+            // Inicia o dashboard mostrando tudo
+            atualizarDashboard();
+        });
+
+        // Preenche a lista de esportes no menu
+        function preencherFiltro() {
+            const esportesUnicos = [...new Set(dadosAtletas.map(d => d.Esporte))].sort();
+            const select = document.getElementById('filtroEsporte');
+            esportesUnicos.forEach(esporte => {
+                const option = document.createElement('option');
+                option.value = esporte;
+                option.innerText = esporte; // Aqui o nome do esporte vem do Python (já deve estar ou em inglês ou português conforme a base)
+                select.appendChild(option);
+            });
+        }
+
+        // Atualiza os números e gráficos quando muda o filtro
+        function atualizarDashboard() {
+            const filtro = document.getElementById('filtroEsporte').value;
+
+            // Lógica: Se for 'Todos', pega tudo. Se não, filtra pelo esporte escolhido.
+            let dados = (filtro === 'Todos') ? dadosAtletas : dadosAtletas.filter(d => d.Esporte === filtro);
+
+            calcularKPIs(dados);
+            renderizarGraficos(dados);
+        }
+
+        // Calcula os números dos cartões (KPIs)
+        function calcularKPIs(dados) {
+            // 1. Total
+            document.getElementById('kpi-total').innerText = dados.length;
+
+            // 2. IMC Médio (Peso / Altura x Altura)
+            let somaIMC = 0;
+            let validosIMC = 0;
+            dados.forEach(d => {
+                if(d.Altura > 0 && d.Peso > 0) {
+                    let alturaM = d.Altura / 100; // Converte cm para metros
+                    somaIMC += (d.Peso / (alturaM * alturaM));
+                    validosIMC++;
+                }
+            });
+            let mediaIMC = validosIMC > 0 ? (somaIMC / validosIMC).toFixed(1) : 0;
+            document.getElementById('kpi-imc').innerText = mediaIMC;
+
+            // 3. Taxa de Medalhas
+            const totalMedalhas = dados.filter(d => d.Medalha !== 'Sem Medalha').length;
+            const taxa = ((totalMedalhas / dados.length) * 100).toFixed(1);
+            document.getElementById('kpi-medalhas').innerText = taxa + '%';
+
+            // 4. Altura Média
+            const mediaAltura = dados.reduce((acc, curr) => acc + curr.Altura, 0) / dados.length;
+            document.getElementById('kpi-altura').innerText = mediaAltura.toFixed(1) + ' cm';
+        }
+
+        // Desenha os gráficos na tela
+        function renderizarGraficos(dados) {
+            // Limpa os gráficos antigos se existirem
+            if (chartDispersao) chartDispersao.destroy();
+            if (chartBarras) chartBarras.destroy();
+            if (chartLinha) chartLinha.destroy();
+
+            // Paleta de Cores Neon para os Esportes
+            const cores = {
+                'Basketball': '#ff0055',    // Rosa Neon
+                'Judo': '#00d4ff',          // Azul Neon
+                'Gymnastics': '#00ff9d',    // Verde Neon
+                'Weightlifting': '#ffcc00', // Amarelo Neon
+                'Athletics': '#bd00ff'      // Roxo Neon
+            };
+
+            // --- 1. GRÁFICO DE DISPERSÃO (Scatter) ---
+            const ctx1 = document.getElementById('scatterChart').getContext('2d');
+            const esportesNoFiltro = [...new Set(dados.map(d => d.Esporte))];
+
+            const datasetsScatter = esportesNoFiltro.map(esporte => ({
+                label: esporte,
+                data: dados.filter(d => d.Esporte === esporte).map(d => ({ x: d.Peso, y: d.Altura })),
+                backgroundColor: cores[esporte] || '#ffffff',
+                pointRadius: 4,
+                pointHoverRadius: 8
+            }));
+
+            chartDispersao = new Chart(ctx1, {
+                type: 'scatter',
+                data: { datasets: datasetsScatter },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: { display: true, text: 'Distribuição Física (Peso x Altura)', color: '#fff', font: {size: 16} }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'Peso (kg)' }, grid: { color: '#333' } },
+                        y: { title: { display: true, text: 'Altura (cm)' }, grid: { color: '#333' } }
+                    }
+                }
+            });
+
+            // --- 2. GRÁFICO DE ROSCA (Gênero) ---
+            const countM = dados.filter(d => d.Sexo === 'M').length;
+            const countF = dados.filter(d => d.Sexo === 'F').length;
+
+            const ctx2 = document.getElementById('barChart').getContext('2d');
+            chartBarras = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Masculino', 'Feminino'], // Traduzido
+                    datasets: [{
+                        data: [countM, countF],
+                        backgroundColor: ['#00d4ff', '#ff0055'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        title: { display: true, text: 'Proporção por Gênero', color: '#fff', font: {size: 14} }
+                    }
+                }
+            });
+
+            // --- 3. GRÁFICO DE LINHA (Timeline) ---
+            // Agrupar dados por ano
+            const anos = {};
+            dados.forEach(d => {
+                if(d.Ano) {
+                    anos[d.Ano] = (anos[d.Ano] || 0) + 1;
+                }
+            });
+            const labelsAno = Object.keys(anos).sort();
+            const valuesAno = labelsAno.map(ano => anos[ano]);
+
+            const ctx3 = document.getElementById('lineChart').getContext('2d');
+            chartLinha = new Chart(ctx3, {
+                type: 'line',
+                data: {
+                    labels: labelsAno,
+                    datasets: [{
+                        label: 'Atletas Participantes', // Traduzido
+                        data: valuesAno,
+                        borderColor: '#bb86fc',
+                        backgroundColor: 'rgba(187, 134, 252, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { title: { display: true, text: 'Evolução da Participação (Linha do Tempo)', color: '#fff', font: {size: 16} } },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { grid: { color: '#333' } }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

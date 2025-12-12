@@ -32,7 +32,7 @@ O projeto passa por todo o ciclo de vida dos dados: ETL, Limpeza, Análise Explo
 2.  **Dashboard:**
     * Acesse a pasta `dashboard`.
     * Abra o arquivo `index.html` em qualquer navegador.
-    * (Ou acesse o Link da Demo ao Vivo aqui: [Link do GitHub Pages será colocado depois])
+    * (Ou acesse o Link da Demo ao Vivo aqui: https://vlbarbosa.github.io/Olympics-Data-Analytics-Portfolio./)
 
 ## 💡 Principais Insights
 * **Segmentação Clara:** O modelo provou que Ginástica e Basquete possuem clusters físicos opostos e facilmente distinguíveis.
@@ -40,4 +40,5 @@ O projeto passa por todo o ciclo de vida dos dados: ETL, Limpeza, Análise Explo
 * **Conversão de Medalhas:** A análise mostrou que certos esportes possuem taxas de medalhas por atleta mais altas devido às competições por equipe.
 
 ---
+
 **Autor:** Vitor Barbosa - https://www.linkedin.com/in/vlbarbosa/

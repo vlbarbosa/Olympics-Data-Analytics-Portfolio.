@@ -42,3 +42,4 @@ O projeto passa por todo o ciclo de vida dos dados: ETL, Limpeza, Análise Explo
 ---
 
 **Autor:** Vitor Barbosa - https://www.linkedin.com/in/vlbarbosa/
+
